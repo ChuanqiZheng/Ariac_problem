@@ -3,6 +3,7 @@
 
 osrf_gear::Shipment g_shipment_wrt_box; // a box
 bool g_order_received = false;
+//vector<osrf_gear::Model> g_actual_part_pose_wrt_world_;
 
 void order_callback(const osrf_gear::Order::ConstPtr & order_msg) {
     if (!g_order_received) {
@@ -65,7 +66,7 @@ int main(int argc, char ** argv) {
  
     osrf_gear::Shipment shipment_status;
 
-    boxInspector.model_poses_wrt_box(shipment_status);    
+    boxInspector.model_poses_wrt_box(shipment_status);
 
     //main fnc: invoke the box inspector to check on order status:
     //fill in vectors of correctly placed parts, misplaced parts, desired coords of misplaced parts,
