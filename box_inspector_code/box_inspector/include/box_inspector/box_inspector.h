@@ -9,6 +9,7 @@
 #include <osrf_gear/Order.h>
 #include <osrf_gear/Product.h>
 #include <xform_utils/xform_utils.h>
+
 using namespace std;
 
 const int NUM_PART_TYPES=5;

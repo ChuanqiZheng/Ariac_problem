@@ -9,6 +9,8 @@
 #include <osrf_gear/Order.h>
 #include <osrf_gear/Product.h>
 #include <xform_utils/xform_utils.h>
+#include <std_msgs/Float64.h>
+
 using namespace std;
 
 const int NUM_PART_TYPES=5;
@@ -59,7 +61,7 @@ public:
   bool model_poses_wrt_box(osrf_gear::LogicalCameraImage box_inspector_image, 
     osrf_gear::Shipment &shipment_status);
   //this version operates on member var box_inspector_image_
-  bool model_poses_wrt_box(osrf_gear::Shipment &shipment_status, vector<osrf_gear::Model> &g_actual_part_pose_wrt_world_);
+  bool model_poses_wrt_box(osrf_gear::Shipment &shipment_status);
 
 
 private:
