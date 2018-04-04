@@ -47,13 +47,12 @@ BoxInspector::BoxInspector(ros::NodeHandle* nodehandle) : nh_(*nodehandle) { //c
      vector<osrf_gear::Model> &misplaced_models_desired_coords_wrt_world,
      vector<osrf_gear::Model> &missing_models_wrt_world,
      vector<osrf_gear::Model> &orphan_models_wrt_world) {
-  //WRITE ME!!!
-  //ROS_WARN("NEED TO WRITE update_inspection() ");
-      vector<osrf_gear::Model> actual_part_pose_wrt_world;
+
+      vector<osrf_gear::Model> actual_part_pose_wrt_world;//use this and desired_models_wrt_world, to classify models
       vector<osrf_gear::Model> pending_desired_models_wrt_world;
-      vector<osrf_gear::Model> pending_actual_models_wrt_world;
+      vector<osrf_gear::Model> pending_actual_models_wrt_world;//need pending lists to record unclassified items
       vector<osrf_gear::Model> update_desired_models_wrt_world;
-      vector<osrf_gear::Model> update_actual_models_wrt_world;
+      vector<osrf_gear::Model> update_actual_models_wrt_world;//need these to update pending lists
       geometry_msgs::Pose cam_pose, model_pose_wrt_cam;
       geometry_msgs::PoseStamped part_pose_wrt_world;
 
@@ -81,6 +80,7 @@ BoxInspector::BoxInspector(ros::NodeHandle* nodehandle) : nh_(*nodehandle) { //c
   update_desired_models_wrt_world.clear();
   update_actual_models_wrt_world.clear();
 
+  //compute actual_part_pose_wrt_world, based on most recent box_inspector_image_
   string box_name("shipping_box");
   osrf_gear::Model model;
   for (int i=0;i<num_parts_seen;i++) {
@@ -93,9 +93,6 @@ BoxInspector::BoxInspector(ros::NodeHandle* nodehandle) : nh_(*nodehandle) { //c
      break;
    }
  }
-  if (!found_box) { //to be implemented
-    ROS_WARN("model_poses_wrt_box(): did not find box in view");
-  }
   cam_pose = box_inspector_image_.pose;
   for (int i = 0; i < num_parts_seen; i++) {
         if (i != i_box) { //if here, have a model NOT the box
@@ -106,15 +103,8 @@ BoxInspector::BoxInspector(ros::NodeHandle* nodehandle) : nh_(*nodehandle) { //c
           actual_part_pose_wrt_world.push_back(model);
         }
       }
-      /*
-      pending_desired_models_wrt_world = desired_models_wrt_world;
-      int num_pending_desired = pending_desired_models_wrt_world.size();
-      int id_pending_desired;
-      pending_actual_models_wrt_world = actual_part_pose_wrt_world;
-      int num_pending_actual = pending_actual_models_wrt_world.size();
-      int id_pending_actual;*/
+
       update_desired_models_wrt_world = desired_models_wrt_world;
-      //pending_desired_models_wrt_world = desired_models_wrt_world;
       int num_update_desired = update_desired_models_wrt_world.size();
       int id_update_desired;
       update_actual_models_wrt_world = actual_part_pose_wrt_world;
@@ -123,26 +113,29 @@ BoxInspector::BoxInspector(ros::NodeHandle* nodehandle) : nh_(*nodehandle) { //c
       int id_update_actual;
       geometry_msgs::Pose pose_update_desired_wrt_actual;
       Eigen::Affine3d affine_update_desired_models_wrt_world, affine_update_actual_models_wrt_world, affine_update_desired_wrt_actual;
-      bool satisfied_model_found = false;
+      bool satisfied_desired_model_found = false;
+      bool satisfied_actual_model_found = false;
       
-      for (int i_desired=0;i_desired<num_update_desired;i_desired++) 
+      //First step: find perfectly matched items, push to satisfied_models_wrt_world, rest go to pending lists.
+      for (int i_desired=0;i_desired<num_update_desired;i_desired++) //check all desired items
       {
         id_update_desired = mappings[update_desired_models_wrt_world[i_desired].type];
-        satisfied_model_found = false;
+        satisfied_desired_model_found = false;
         update_actual_models_wrt_world.clear();
         update_actual_models_wrt_world = pending_actual_models_wrt_world;
         num_update_actual = update_actual_models_wrt_world.size();
-        pending_actual_models_wrt_world.clear();
-        for (int i_actual=0;i_actual<num_update_actual;i_actual++)
+        pending_actual_models_wrt_world.clear();//push "pending" list to "update" list and clear "pending" list. Now "pending" list is ready to be updated again.
+        for (int i_actual=0;i_actual<num_update_actual;i_actual++)//check all actual items
         {
+          satisfied_actual_model_found = false;
           id_update_actual = mappings[update_actual_models_wrt_world[i_actual].type];
-          if((id_update_desired == id_update_actual)&&(!satisfied_model_found))
+          if((id_update_desired == id_update_actual)&&(!satisfied_desired_model_found))
           {
             float dx = update_desired_models_wrt_world[i_desired].pose.position.x - update_actual_models_wrt_world[i_actual].pose.position.x;
             float dy = update_desired_models_wrt_world[i_desired].pose.position.y - update_actual_models_wrt_world[i_actual].pose.position.y;
             float dz = update_desired_models_wrt_world[i_desired].pose.position.z - update_actual_models_wrt_world[i_actual].pose.position.z;
             float dist = (float)sqrt(dx*dx + dy*dy + dz*dz);
-            if (dist < 0.03)
+            if (dist < 0.03)//tolerance in position
             {
               affine_update_desired_models_wrt_world = xformUtils_.transformPoseToEigenAffine3d(update_desired_models_wrt_world[i_desired].pose);
               affine_update_actual_models_wrt_world = xformUtils_.transformPoseToEigenAffine3d(update_actual_models_wrt_world[i_actual].pose);
@@ -153,45 +146,36 @@ BoxInspector::BoxInspector(ros::NodeHandle* nodehandle) : nh_(*nodehandle) { //c
               {
                 angle_update_desired_wrt_actual -= 2*pi;
               }
-              if ((angle_update_desired_wrt_actual<0.1)&&(angle_update_desired_wrt_actual>-0.1))
+              if ((angle_update_desired_wrt_actual<0.1)&&(angle_update_desired_wrt_actual>-0.1))//tolerance in orientation
               {
-                satisfied_models_wrt_world.push_back(update_actual_models_wrt_world[i_actual]);
-                satisfied_model_found = true;
+                satisfied_models_wrt_world.push_back(update_actual_models_wrt_world[i_actual]);//satisfied match found, push to satisfied_models_wrt_world
+                satisfied_desired_model_found = true;//a reminder whether to push corresponding desired item to pending list
+                satisfied_actual_model_found = true;//a reminder whether to push corresponding actual item to pending list
               }
-              else
-              {
-                pending_actual_models_wrt_world.push_back(update_actual_models_wrt_world[i_actual]);
-              }
-            }
-            else
-            {
-              pending_actual_models_wrt_world.push_back(update_actual_models_wrt_world[i_actual]);
             }
           }
-          else
+          if(!satisfied_actual_model_found)
           {
             pending_actual_models_wrt_world.push_back(update_actual_models_wrt_world[i_actual]);
           }
         }
-        if(!satisfied_model_found)
+        if(!satisfied_desired_model_found)
         {
           pending_desired_models_wrt_world.push_back(update_desired_models_wrt_world[i_desired]);
         }
       }
-      //ROS_INFO_STREAM("size of pending_desired_models_wrt_world:"<< pending_desired_models_wrt_world.size() << endl);
-      //ROS_INFO_STREAM("size of pending_actual_models_wrt_world:"<< pending_actual_models_wrt_world.size() << endl);
-      /*
-      update_actual_models_wrt_world.clear();
-      update_actual_models_wrt_world = pending_actual_models_wrt_world;
-      pending_actual_models_wrt_world.clear(); */
+      
       update_desired_models_wrt_world.clear();
       update_desired_models_wrt_world = pending_desired_models_wrt_world;
-      pending_desired_models_wrt_world.clear();
+      pending_desired_models_wrt_world.clear();//push "pending" list to "update" list and clear "pending" list.
       num_update_desired = update_desired_models_wrt_world.size();
 
-      vector<osrf_gear::Model> pending_misplaced_actual_models_wrt_world;
+      vector<osrf_gear::Model> pending_misplaced_actual_models_wrt_world;//need this to compute and compare distances between misplaced pairs
       pending_misplaced_actual_models_wrt_world.clear();
 
+      //Step two: check pending list of desired items, they should be either "misplaced" or "missing".
+      //Misplaced match is based on minimum distance between items with the same id.
+      //Unclassified actual items are pushed to third step, which should be all "orphan"s.
       for (int i_desired=0;i_desired<num_update_desired;i_desired++) 
       {
         id_update_desired = mappings[update_desired_models_wrt_world[i_desired].type];
@@ -203,28 +187,28 @@ BoxInspector::BoxInspector(ros::NodeHandle* nodehandle) : nh_(*nodehandle) { //c
         {
           id_update_actual = mappings[update_actual_models_wrt_world[i_actual].type];
           if(id_update_desired == id_update_actual)
-          {
+          {//all actual items with the right id are qualified candidates
             pending_misplaced_actual_models_wrt_world.push_back(update_actual_models_wrt_world[i_actual]);
           }
           else
-          {
+          {//actual items with wrong name go to pending list
             pending_actual_models_wrt_world.push_back(update_actual_models_wrt_world[i_actual]);
           }
         }
         int num_misplaced_candidates = pending_misplaced_actual_models_wrt_world.size();
         if (num_misplaced_candidates == 0)
-        {
+        {//no candidates: this desired item is missing
           missing_models_wrt_world.push_back(update_desired_models_wrt_world[i_desired]);
         }
         else if (num_misplaced_candidates == 1)
-        {
+        {//only one candidate: push to "misplaced" list
           misplaced_models_actual_coords_wrt_world.push_back(pending_misplaced_actual_models_wrt_world[0]);
           misplaced_models_desired_coords_wrt_world.push_back(update_desired_models_wrt_world[i_desired]);
           pending_misplaced_actual_models_wrt_world.clear();
         }
         else
-        {
-          float former_dist = 1000.00;
+        {//more than one candidate: compute distance and compare
+          float former_dist = 1000.00;//one impossible long distance
           int i_success_candidate;
           for(int i_misplaced=0;i_misplaced<num_misplaced_candidates;i_misplaced++)
           {
@@ -233,13 +217,13 @@ BoxInspector::BoxInspector(ros::NodeHandle* nodehandle) : nh_(*nodehandle) { //c
             float dz = update_desired_models_wrt_world[i_desired].pose.position.z - pending_misplaced_actual_models_wrt_world[i_misplaced].pose.position.z;
             float dist = (float)sqrt(dx*dx + dy*dy + dz*dz);
             if(dist < former_dist)
-            {
+            {//update shortest distance and corresponding actual item
               former_dist = dist;
               i_success_candidate = i_misplaced;
             }
           }
           for(int i_misplaced=0;i_misplaced<num_misplaced_candidates;i_misplaced++)
-          {
+          {//push all the failed candidates to pending list
             if(i_misplaced != i_success_candidate)
             {
               pending_actual_models_wrt_world.push_back(pending_misplaced_actual_models_wrt_world[i_misplaced]);
@@ -250,21 +234,13 @@ BoxInspector::BoxInspector(ros::NodeHandle* nodehandle) : nh_(*nodehandle) { //c
           pending_misplaced_actual_models_wrt_world.clear();
         }
       }
-
+      
+      //Step 3: All the actual items on pending list go to "orphan" list.
       int num_orphan = pending_actual_models_wrt_world.size();
       for(int i_orphan=0;i_orphan<num_orphan;i_orphan++)
       {
         orphan_models_wrt_world.push_back(pending_actual_models_wrt_world[i_orphan]);
       }
-
-
-  //THIS  IS WRONG...but an example of how to get models from image and sort into category vectors
-  /*
-  for (int i=0;i<num_parts_seen;i++) {
-     orphan_models_wrt_world.push_back(box_inspector_image_.models[i]);
-  }*/
-
-
    }
 
 //intent of this function is, get a snapshot from the box-inspection camera;

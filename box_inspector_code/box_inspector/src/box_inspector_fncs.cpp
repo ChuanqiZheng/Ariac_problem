@@ -54,14 +54,8 @@ bool BoxInspector::model_poses_wrt_box(osrf_gear::Shipment &shipment_status) {
             ROS_INFO_STREAM("model: " << model << endl);
             model_pose_wrt_cam = model.pose;
             part_pose_wrt_world = compute_stPose(cam_pose, model_pose_wrt_cam);
-            //g_actual_part_pose_wrt_world_[igmodel].pose = part_pose_wrt_world.pose;
-            //g_actual_part_pose_wrt_world_[igmodel].type = model.type;
-            //igmodel ++;
             affine_part_wrt_world = xformUtils_.transformPoseToEigenAffine3d(part_pose_wrt_world);
-            ROS_INFO_STREAM("part pose wrt world: " << part_pose_wrt_world << endl);
-            
-            //ROS_WARN("model_poses_wrt_box(): FINISH ME!  compute part_pose_wrt_box");
-            //MISSING LINES HERE...
+            //ROS_INFO_STREAM("part pose wrt world: " << part_pose_wrt_world << endl);
             affine_part_wrt_box = affine_box_pose_wrt_world.inverse() * affine_part_wrt_world;
             part_pose_wrt_box = xformUtils_.transformEigenAffine3dToPose(affine_part_wrt_box);
 
@@ -76,7 +70,6 @@ bool BoxInspector::model_poses_wrt_box(osrf_gear::Shipment &shipment_status) {
         }
     }
     ROS_INFO_STREAM("resulting part poses w/rt box: " << shipment_status << endl);
-
 }
 
 
@@ -96,7 +89,7 @@ void BoxInspector::compute_shipment_poses_wrt_world(osrf_gear::Shipment shipment
     //osrf_gear::Model model;
 
     num_models = shipment_wrt_box.products.size(); //number of products in this desired shipment
-    if (num_models == 0) //no product required in the box
+    if (num_models == 0)
     {
         ROS_INFO("Empty box required");
     }
@@ -107,17 +100,12 @@ void BoxInspector::compute_shipment_poses_wrt_world(osrf_gear::Shipment shipment
         {
             model_wrt_box_pose = shipment_wrt_box.products[i_model].pose;
             desired_model_wrt_world = compute_stPose(box_wrt_world_pose,model_wrt_box_pose);
-            //model.pose = desired_model_wrt_world.pose;
-            //model.type = shipment_wrt_box.products[i_model].type;
             model.type = shipment_wrt_box.products[i_model].type;
             model.pose = desired_model_wrt_world.pose;
             desired_models_wrt_world.push_back(model);
-            //desired_models_wrt_world[i_model].type = shipment_wrt_box.products[i_model].type;
-            //desired_models_wrt_world[i_model].pose = desired_model_wrt_world.pose;
         }
     }
-    ROS_INFO("compute_shipment_poses_wrt_world complete!");
-    
+    ROS_INFO("compute_shipment_poses_wrt_world complete!"); 
 }
 
 
